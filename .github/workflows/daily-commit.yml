@@ -1,69 +1,59 @@
-name: Rohit's Daily Commit
+name: Daily Commit
+
 on:
   schedule:
-    - cron: '0 3 * * *'  # 3:00 AM UTC = 08:30 AM IST
-  workflow_dispatch:  # Allows manual trigger
-permissions:
-  contents: write  # Explicitly gives write permission to repository contents
+    - cron: '45 02 * * *'  # 8:15 AM IST (02:45 UTC)
+
 jobs:
-  commit:
+  daily-commit:
     runs-on: windows-latest
+    
     steps:
-    - name: Checkout Repository
+    - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # Fetch all history for proper commit counting
+        fetch-depth: 0  # Ensures we can access all history
     
-    - name: Configure Git
+    - name: Setup Git
       run: |
-        git config --global user.name "rohitsriv28"
-        git config --global user.email "rohitraj2002@gmail.com"
-      shell: pwsh
+        git config --global user.name 'GitHub Actions Bot'
+        git config --global user.email 'actions@github.com'
     
-    - name: Update or Create Commit Info File
+    - name: Get or Initialize Commit Counter
+      id: commit-counter
+      shell: powershell
       run: |
-        $FILE = "commit_info.md"
-        $CURRENT_DATE = "$(Get-Date -Format 'yyyy-MM-dd')"
-        
-        if (!(Test-Path $FILE)) {
-          # Create new file with the first commit message
-          "Hi, this is my 1st commit on $CURRENT_DATE." | Out-File -FilePath $FILE
-        } else {
-          # Update existing file
-          $content = Get-Content $FILE -Raw
-          
-          # Extract current commit number
-          $match = [regex]::Match($content, "Hi, this is my (\d+)(st|nd|rd|th) commit")
-          if ($match.Success) {
-            $currentCount = [int]$match.Groups[1].Value
-            $nextCount = $currentCount + 1
-            
-            # Determine the correct ordinal suffix
-            $suffix = "th"
-            if ($nextCount % 100 -lt 11 -or $nextCount % 100 -gt 13) {
-              switch ($nextCount % 10) {
-                1 { $suffix = "st" }
-                2 { $suffix = "nd" }
-                3 { $suffix = "rd" }
-              }
-            }
-            
-            # Replace entire content with the new message
-            "Hi, this is my ${nextCount}${suffix} commit on $CURRENT_DATE." | Out-File -FilePath $FILE
-          } else {
-            # If pattern not found, create with commit number 1
-            "Hi, this is my 1st commit on $CURRENT_DATE." | Out-File -FilePath $FILE
-          }
+        # Check if commit-info.md exists
+        if (-not (Test-Path commit-info.md)) {
+          "1" | Out-File -FilePath commit-info.md
         }
         
-        # Get the new commit number for the commit message
-        $newContent = Get-Content $FILE -Raw
-        $newMatch = [regex]::Match($newContent, "Hi, this is my (\d+)(st|nd|rd|th) commit")
-        $commitNum = $newMatch.Groups[1].Value
-        $suffix = $newMatch.Groups[2].Value
+        # Read current commit number
+        $COMMIT_NUM = Get-Content commit-info.md
         
-        # Commit and push changes
-        git add .
-        git commit -m "Updated to my ${commitNum}${suffix} commit on $CURRENT_DATE"
-        git push "https://${{ github.token }}@github.com/${{ github.repository }}.git"
-      shell: pwsh
+        # Determine suffix
+        switch ($COMMIT_NUM % 10) {
+          1 { 
+            $SUFFIX = if ($COMMIT_NUM -ne 11) { "st" } else { "th" }
+          }
+          2 { 
+            $SUFFIX = if ($COMMIT_NUM -ne 12) { "nd" } else { "th" }
+          }
+          3 { 
+            $SUFFIX = if ($COMMIT_NUM -ne 13) { "rd" } else { "th" }
+          }
+          default { $SUFFIX = "th" }
+        }
+        
+        # Increment commit number
+        $NEXT_COMMIT_NUM = [int]$COMMIT_NUM + 1
+        $NEXT_COMMIT_NUM | Out-File -FilePath commit-info.md
+        
+        # Create commit file with suffix
+        "This is the $COMMIT_NUM$SUFFIX daily automated commit." | Out-File -FilePath "daily-commit-$COMMIT_NUM$SUFFIX.txt"
+    
+    - name: Commit and Push
+      run: |
+        git add commit-info.md daily-commit-*.txt
+        git commit -m "Automated daily commit $(Get-Date -Format 'yyyy-MM-dd')"
+        git push
