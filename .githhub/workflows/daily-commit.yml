@@ -1,0 +1,55 @@
+name: Daily Commit
+on:
+  schedule:
+    - cron: '00 3 * * *'  # 8:30 AM IST (3:00 AM UTC)
+  workflow_dispatch:  # Allow manual triggering for testing
+
+jobs:
+  daily-commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Explicitly set write permissions
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup Git
+      run: |
+        git config --global user.name 'rohitsriv28'
+        git config --global user.email 'rohitraj2002ind@gmail.com'
+    
+    - name: Update Commit Info
+      run: |
+        # Ensure commit-info.md exists
+        touch commit-info.md
+        
+        # Read or initialize commit number
+        COMMIT_NUM=$(cat commit-info.md 2>/dev/null || echo 0)
+        COMMIT_NUM=$((COMMIT_NUM + 1))
+        
+        # Determine suffix
+        if [[ $COMMIT_NUM -gt 10 && $COMMIT_NUM -lt 14 ]]; then
+          SUFFIX="th"
+        else
+          case $((COMMIT_NUM % 10)) in
+            1) SUFFIX="st" ;;
+            2) SUFFIX="nd" ;;
+            3) SUFFIX="rd" ;;
+            *) SUFFIX="th" ;;
+          esac
+        fi
+        
+        # Update commit-info.md with number and message
+        echo "$COMMIT_NUM" > commit-info.md
+        echo "This is the ${COMMIT_NUM}${SUFFIX} automated commit." >> commit-info.md
+        
+        # Show file content for debugging
+        echo "Updated commit-info.md content:"
+        cat commit-info.md
+    
+    - name: Commit Changes
+      run: |
+        git add commit-info.md
+        git diff --staged --quiet || git commit -m "Automated daily commit $(date +'%Y-%m-%d')"
+        git push
